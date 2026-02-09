@@ -1,0 +1,63 @@
+# ===================================================================
+# FLIGHT PLAN v1
+# Design-time architecture & compliance layer
+# ===================================================================
+#
+# Schemas for generated artifacts live in this repo under ./Schema/
+# - ./Schema/flightplan.compiled.schema.json
+# - ./Schema/deployment.snapshot.schema.json
+#
+# Tip: Start small. Add services/resources, then add snapshots and run:
+#   flightplan publish flightplan.yaml <snapshot.json>
+# ===================================================================
+
+application:
+  name: My Application
+  description: Describe what this system does
+
+# Base and org-level registries merged at runtime
+uses:
+  - ./base-dataclasses.yaml
+  - ./base-platforms.yaml
+  - ./base-terms.yaml
+  - ./org-zones.yaml
+  - ./org-environments.yaml
+  - ./org-teams.yaml
+  - ./org-tooling.yaml
+
+resources:
+  primary-db:
+    type: database
+    description: Primary application database
+    zone: zone://internal
+    owner: team://backend
+    platform: cloud://aws/rds-postgresql
+    dataClasses:
+      - dataclass://personal_data
+
+services:
+  api:
+    description: Public API service
+    # Optional: link to source control for this service
+    # repoUrl: https://github.com/your-org/your-repo
+    zone: zone://public
+    owner: team://backend
+    platform: tech://dotnet/8
+    exports:
+      public-api:
+        protocol: https
+        auth: oauth2
+        # Optional: defaults to 'internal' when omitted
+        visibility: external
+        dataClasses:
+          - dataclass://personal_data
+        # Optional: if this export is implemented by another service's export,
+        # the compiler will automatically add the corresponding dependency.
+        # forwardsTo: svc://users/public-api
+
+        # Optional: external consumers of this export (informational; shown in reports)
+        # consumers:
+        #   - external://okta/my-app
+    dependsOn:
+      - uri: res://primary-db
+        access: read-write

@@ -1,0 +1,8 @@
+# -------------------------------------------------------------------
+# TEAMS (ownership & accountability)
+# -------------------------------------------------------------------
+teams:
+  frontend:
+    description: Frontend development team
+  backend:
+    description: Backend services team

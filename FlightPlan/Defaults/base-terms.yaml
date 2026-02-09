@@ -1,0 +1,427 @@
+# ===================================================================
+# SHARED TERMS (vocabulary)
+# Loaded via `uses:` so systems can share a common dictionary.
+# ===================================================================
+
+terms:
+  # Term keys are free-form strings; we recommend scoping by area.
+  # This one aligns with annotations.deployment.rolloutStrategy.
+  deployment.rolloutStrategy:
+    rolling:
+      description: "Gradually replace instances with the new version (no big-bang cutover)."
+    canary:
+      description: "Shift a small percentage of traffic to the new version, then expand if healthy."
+    blueGreen:
+      description: "Deploy new version alongside old, then switch traffic over (fast rollback by switching back)."
+    blue-green:
+      description: "Deploy new version alongside old, then switch traffic over (fast rollback by switching back)."
+    ring:
+      description: "Progressively roll out by cohorts (rings) such as internal → beta → general."
+    recreate:
+      description: "Stop the old version and then start the new version (often implies downtime)."
+
+  deployment.rollbackStrategy:
+    rollback:
+      description: "Revert to the previous version if health checks fail (switch back / redeploy previous)."
+    roll-forward:
+      description: "Fix forward by deploying a new version rather than reverting (preferred when rollback is risky)."
+    abort-canary:
+      description: "Stop a canary rollout and route traffic back to the stable version."
+    switchback:
+      description: "For blue/green, switch traffic back to the old environment quickly."
+
+  deployment.migrationStrategy:
+    expand-contract:
+      description: "Two-phase schema change: add backwards-compatible changes, deploy app, then remove old fields."
+    backward-compatible:
+      description: "Migrations that can run without coordinated downtime and support old/new app versions."
+    big-bang:
+      description: "One coordinated cutover where app and schema change together (higher risk, often downtime)."
+    dual-write:
+      description: "Write to both old and new stores during transition; eventually read from the new store."
+    shadow-read:
+      description: "Read from the new store in parallel (not serving) to validate behavior before cutover."
+
+  deployment.topology:
+    monolith:
+      description: "Single deployable unit containing most of the system."
+    modular-monolith:
+      description: "Single deployable with strong internal module boundaries."
+    microservices:
+      description: "Multiple independently deployable services communicating over the network."
+    event-driven:
+      description: "Asynchronous integration via events/streams; services react to published events."
+    serverless:
+      description: "Functions or managed runtimes with automatic scaling and per-execution billing."
+    batch:
+      description: "Scheduled or triggered jobs processing data in discrete runs."
+
+  deployment.ingress:
+    api-gateway:
+      description: "Central entry point for routing, auth, rate limiting, and request shaping."
+    ingress-controller:
+      description: "Cluster ingress (e.g., Kubernetes Ingress) providing HTTP routing to services."
+    load-balancer:
+      description: "Layer 4/7 load balancer as the primary entry point."
+    service-mesh:
+      description: "Traffic enters via mesh gateway; mesh provides mTLS and routing between services."
+    direct:
+      description: "Clients connect directly to the service endpoint (generally avoid for external traffic)."
+
+  deployment.tlsTermination:
+    edge:
+      description: "TLS terminates at the edge (gateway/load balancer); internal hops may be plaintext."
+    reencrypt:
+      description: "TLS terminates at the edge and traffic is re-encrypted to upstream services."
+    passthrough:
+      description: "TLS is not terminated at the edge; it passes through to the service."
+    end-to-end:
+      description: "TLS from client all the way to the service; intermediate hops preserve encryption."
+    mtls:
+      description: "Mutual TLS between hops (service-to-service identity and encryption)."
+
+  protocol:
+    https:
+      description: "HTTP over TLS (standard for web APIs and browsers)."
+    http:
+      description: "HTTP without TLS (typically internal only; prefer https)."
+    grpc:
+      description: "gRPC over HTTP/2 (often with TLS); strongly typed RPC."
+    websocket:
+      description: "Full-duplex messaging over a single TCP connection (ws/wss)."
+    wss:
+      description: "WebSocket over TLS."
+    tcp:
+      description: "Raw TCP protocol (custom or non-HTTP services)."
+    amqp:
+      description: "Advanced Message Queuing Protocol (queues, pub/sub)."
+    kafka:
+      description: "Kafka protocol for event streaming."
+    sftp:
+      description: "SSH File Transfer Protocol (file exchange)."
+
+  visibility:
+    internal:
+      description: "Intended only for internal callers within the organization/system boundary."
+    external:
+      description: "Callable by external consumers; treat as a primary ingress surface."
+    public:
+      description: "Accessible publicly (no network restriction). Ensure strong authz and rate limiting."
+    partner:
+      description: "Accessible to specific partner networks/tenants; typically contract-bound."
+
+  auth:
+    none:
+      description: "No authentication (generally only for internal/private endpoints)."
+    oauth2:
+      description: "OAuth 2.0 (often with OIDC) for delegated authorization via access tokens."
+    oidc:
+      description: "OpenID Connect (identity layer on OAuth 2.0)."
+    bearer:
+      description: "Bearer token (JWT or opaque); verify signature/issuer/audience/expiry."
+    api-key:
+      description: "Static token sent with requests; rotate regularly and scope permissions tightly."
+    saml2:
+      description: "SAML 2.0 (commonly used for browser-based SSO)."
+    mtls:
+      description: "Mutual TLS client certificates (strong transport-level client identity)."
+    basic:
+      description: "HTTP Basic auth (avoid for external; only with TLS and strong password policies)."
+
+  hosting:
+    public-cloud:
+      description: "Runs primarily on a public cloud provider (AWS/Azure/GCP)."
+    private-cloud:
+      description: "Runs on a private cloud or hosted private infrastructure."
+    on-prem:
+      description: "Runs in on-premises datacenters owned/operated by the organization."
+    hybrid:
+      description: "Runs across multiple environments (e.g., on-prem + cloud)."
+    edge:
+      description: "Runs close to users/devices (edge sites), often latency-sensitive."
+
+  serviceModel:
+    SaaS:
+      description: "Software-as-a-Service (multi-tenant or single-tenant product delivered to customers)."
+    internal:
+      description: "Internal product/system used within the organization."
+    platform:
+      description: "Internal platform capability consumed by other teams (paved road)."
+    managed-service:
+      description: "Service operated by a provider with defined SLOs and operational responsibilities."
+
+  tenancy:
+    single-tenant:
+      description: "Each customer has isolated resources (strong isolation, higher cost)."
+    multi-tenant:
+      description: "Multiple customers share resources with logical isolation (efficiency, requires strong controls)."
+    hybrid:
+      description: "Mix of single-tenant and multi-tenant patterns (e.g., shared control plane + isolated data plane)."
+
+  kind:
+    database:
+      description: "Relational or document database used for durable storage."
+    cache:
+      description: "In-memory cache for performance (typically non-authoritative)."
+    queue:
+      description: "Point-to-point asynchronous messaging queue."
+    topic:
+      description: "Publish/subscribe channel for messages or events."
+    object-storage:
+      description: "Blob/object storage for files and large unstructured data."
+    files:
+      description: "File store or shared filesystem."
+    search:
+      description: "Search index (e.g., Elasticsearch/OpenSearch) for query and aggregation."
+    messaging:
+      description: "Messaging infrastructure (broker/service) supporting async communication."
+    external-service:
+      description: "Third-party or out-of-system dependency (SaaS/API/partner system)."
+    secrets:
+      description: "Secrets manager or key vault for credentials, API keys, and certificates."
+
+  dependencyKind:
+    service-to-service:
+      description: "A service calls another service (sync or async) via an interface/export."
+    service-to-resource:
+      description: "A service uses a resource (database, queue, storage, external system)."
+
+  access:
+    read:
+      description: "Reads data but does not modify it."
+    write:
+      description: "Writes or modifies data."
+    read-write:
+      description: "Reads and writes data."
+    admin:
+      description: "Administrative access (high privilege)."
+    expected:
+      description: "A documented exception/expected crossing that should still be reviewed periodically."
+    exception:
+      description: "An explicit exception to normal policy (requires justification and review cadence)."
+
+  trust:
+    low:
+      description: "Untrusted or internet-exposed zone; assume hostile traffic."
+    medium:
+      description: "Partially trusted zone (e.g., partner networks); apply strong boundary controls."
+    high:
+      description: "Highly trusted internal zone with strict access control."
+
+  supportModel:
+    on-call:
+      description: "A dedicated on-call rotation supports incidents and pages 24/7 or during business hours."
+    follow-the-sun:
+      description: "Support coverage handed off across time zones to provide continuous coverage."
+    best-effort:
+      description: "No formal incident response; support during business hours as available."
+    managed:
+      description: "A managed service/provider handles operations and incident response."
+
+  availability:
+    tier-0:
+      description: "Mission-critical; severe business impact if down (highest availability expectations)."
+    tier-1:
+      description: "Critical; significant impact if down; strong SLOs and response expectations."
+    tier-2:
+      description: "Important; moderate impact; availability targets appropriate to business needs."
+    tier-3:
+      description: "Non-critical; limited impact; relaxed targets."
+
+  errorBudgetPolicy:
+    freeze:
+      description: "Pause feature work when error budget is exhausted; focus on reliability."
+    slow-down:
+      description: "Reduce change rate and increase guardrails when error budget is low."
+    none:
+      description: "No formal policy; track reliability but no explicit engineering trade-off."
+
+  backupStrategy:
+    snapshots:
+      description: "Periodic full snapshots/backups of data (restore point recovery)."
+    continuous:
+      description: "Continuous backup or point-in-time recovery where available."
+    replicated:
+      description: "Data replicated to secondary region/site for durability and DR."
+
+  restoreTestCadence:
+    monthly:
+      description: "Restore procedures are tested monthly."
+    quarterly:
+      description: "Restore procedures are tested quarterly."
+    annually:
+      description: "Restore procedures are tested annually (generally too infrequent for critical systems)."
+
+  retryPolicy:
+    none:
+      description: "No retries; failures surface immediately (may be appropriate for non-idempotent writes)."
+    bounded:
+      description: "Limited retries with backoff and jitter; avoid thundering herds."
+    exponential-backoff:
+      description: "Retries with increasing delays; include jitter; cap maximum delay."
+
+  timeoutPolicy:
+    default:
+      description: "Reasonable timeouts enforced; avoid unbounded waits and resource exhaustion."
+    aggressive:
+      description: "Short timeouts for latency-sensitive paths; requires careful tuning."
+
+  idempotency:
+    required:
+      description: "Operations must be safe to retry (same request can be applied multiple times)."
+    best-effort:
+      description: "Some operations are idempotent; document exceptions."
+
+  logging:
+    structured:
+      description: "Machine-parseable logs (JSON) with consistent fields and correlation IDs."
+    unstructured:
+      description: "Plaintext logs; harder to query and correlate."
+
+  metrics:
+    golden-signals:
+      description: "Track latency, traffic, errors, and saturation (SRE golden signals)."
+    business:
+      description: "Track product/business KPIs in addition to technical metrics."
+
+  tracing:
+    distributed:
+      description: "End-to-end trace correlation across services (OpenTelemetry-style)."
+    none:
+      description: "No distributed tracing (rely on logs/metrics only)."
+
+  rateLimiting:
+    per-client:
+      description: "Limit requests per consumer/client to protect service and enforce fairness."
+    global:
+      description: "Limit total traffic to protect downstream systems."
+    token-bucket:
+      description: "Token-bucket/leaky-bucket style limiting for smoothing bursts."
+
+  versioningPolicy:
+    semver:
+      description: "Semantic versioning for API contracts (MAJOR/MINOR/PATCH)."
+    date-based:
+      description: "Version by date (e.g., 2026-01-01) often paired with deprecation windows."
+
+  deprecationPolicy:
+    timeboxed:
+      description: "Old versions are supported for a fixed time window with clear dates."
+    n-versions:
+      description: "Support the latest N versions; deprecate older versions."
+
+  isolationModel:
+    shared:
+      description: "Tenants share compute/storage with logical isolation."
+    pooled:
+      description: "Resources are pooled but strongly partitioned per tenant."
+    siloed:
+      description: "Each tenant has dedicated resources (strongest isolation)."
+
+  partitioningStrategy:
+    by-tenant-id:
+      description: "Partition data by tenant identifier (common for multi-tenant systems)."
+    by-region:
+      description: "Partition data by geography/region; may also include tenant."
+
+  tenantAwareAuthz:
+    enforced:
+      description: "Authorization checks consistently enforce tenant boundaries at every layer."
+    partial:
+      description: "Some tenant checks exist; document gaps and remediation plan."
+
+  noisyNeighborMitigation:
+    quotas:
+      description: "Per-tenant quotas/limits to prevent a single tenant from consuming all resources."
+    rate-limits:
+      description: "Per-tenant rate limits to smooth load and protect shared infrastructure."
+    isolation:
+      description: "Isolation via dedicated capacity or scheduling to reduce contention."
+
+  authModel:
+    centralized:
+      description: "Authentication handled by a central identity provider/gateway; services trust propagated identity."
+    per-service:
+      description: "Each service validates tokens/credentials independently."
+    mfa:
+      description: "Multi-factor authentication is required for user sign-in (e.g., TOTP, WebAuthn/passkeys). Usually enforced by the IdP."
+    saml:
+      description: "SAML-based SSO (typically browser-facing apps) where an IdP issues assertions consumed by the application."
+    jwt:
+      description: "JWT-based auth where clients present signed tokens (bearer tokens) validated by the gateway and/or services (issuer/audience/expiry)."
+    oidc:
+      description: "OpenID Connect (OIDC) sign-in and token issuance via an IdP (commonly paired with OAuth2 access tokens)."
+    session-cookie:
+      description: "Server-managed session using secure cookies (often for browser apps); requires CSRF protections and secure session storage."
+
+  authorizationModel:
+    rbac:
+      description: "Role-based access control (roles grant permissions)."
+    abac:
+      description: "Attribute-based access control (policies evaluate attributes/claims/context)."
+    scopes:
+      description: "OAuth scopes/claims-based authorization."
+
+  auditLogging:
+    required:
+      description: "Security-relevant actions are logged with actor, action, target, and outcome."
+    best-effort:
+      description: "Some audit logging exists; document gaps and improve over time."
+
+  encryptionAtRest:
+    enabled:
+      description: "Stored data is encrypted at rest using managed keys or KMS."
+    customer-managed-keys:
+      description: "Encryption uses customer-managed keys (bring-your-own-key/CMK)."
+
+  encryptionInTransit:
+    tls:
+      description: "TLS used for network transport encryption."
+    mtls:
+      description: "Mutual TLS used between services for both encryption and identity."
+
+  secretsManagement:
+    vault:
+      description: "Secrets stored in a dedicated secrets manager (vault/key vault) with rotation."
+    env-vars:
+      description: "Secrets injected via environment variables (acceptable with strong runtime controls)."
+
+  keyManagement:
+    kms:
+      description: "Keys managed via a KMS/HSM-backed service."
+    hsm:
+      description: "Hardware security module (highest assurance) for key storage and operations."
+
+  systemOfRecord:
+    this-system:
+      description: "This system is the authoritative source for this data domain."
+    external:
+      description: "An external system is authoritative; this system caches/replicates/derives data."
+
+  retentionPolicy:
+    indefinite:
+      description: "Data retained without a defined expiration (avoid unless required)."
+    timeboxed:
+      description: "Data retained for a fixed period (e.g., 30/90/365 days) then deleted/archived."
+
+  deletionPolicy:
+    hard-delete:
+      description: "Data is permanently removed (required for some compliance cases)."
+    soft-delete:
+      description: "Data is marked deleted but retained for recovery/forensics until purged."
+
+  accessModel:
+    least-privilege:
+      description: "Access is granted minimally; default deny; periodic review and rotation."
+    broad:
+      description: "Broad access (avoid); document compensating controls and review cadence."
+
+  compliance:
+    hipaa:
+      description: "Health Insurance Portability and Accountability Act (US healthcare)."
+    pci-dss:
+      description: "Payment Card Industry Data Security Standard."
+    gdpr:
+      description: "General Data Protection Regulation (EU)."
+    soc2:
+      description: "Service Organization Control 2 (trust services criteria)."

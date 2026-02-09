@@ -1,0 +1,52 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <!-- <PublishAot>true</PublishAot> -->
+        <!-- <InvariantGlobalization>true</InvariantGlobalization> -->
+        <!-- <StripSymbols>true</StripSymbols> -->
+    </PropertyGroup>
+    
+    <ItemGroup>
+        <PackageReference Include="Markdig" Version="0.44.0" /> 
+        <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+        <PackageReference Include="YamlDotNet" Version="16.3.0" />
+        <ProjectReference Include="..\FlightPlan.Core\FlightPlan.Core.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <EmbeddedResource Include="Defaults/base-dataclasses.yaml">
+            <LogicalName>FlightPlan.Cli.Embedded.base-dataclasses.yaml</LogicalName>
+        </EmbeddedResource>
+        <EmbeddedResource Include="Defaults/base-platforms.yaml">
+            <LogicalName>FlightPlan.Cli.Embedded.base-platforms.yaml</LogicalName>
+        </EmbeddedResource>
+        <EmbeddedResource Include="Defaults/org-teams.yaml">
+            <LogicalName>FlightPlan.Cli.Embedded.org-teams.yaml</LogicalName>
+        </EmbeddedResource>
+        <EmbeddedResource Include="Defaults/org-zones.yaml">
+            <LogicalName>FlightPlan.Cli.Embedded.org-zones.yaml</LogicalName>
+        </EmbeddedResource>
+        <EmbeddedResource Include="Defaults/org-environments.yaml">
+            <LogicalName>FlightPlan.Cli.Embedded.org-environments.yaml</LogicalName>
+        </EmbeddedResource>
+
+        <EmbeddedResource Include="Defaults/flightplan.yaml">
+            <LogicalName>FlightPlan.Cli.Embedded.flightplan.yaml</LogicalName>
+        </EmbeddedResource>
+
+        <EmbeddedResource Include="Resources/mermaid-init.html">
+            <LogicalName>Flight.Resources.mermaid-init.html</LogicalName>
+        </EmbeddedResource>
+
+        <EmbeddedResource Include="Resources/serve-styles.css">
+            <LogicalName>Flight.Resources.serve-styles.css</LogicalName>
+        </EmbeddedResource>
+
+        <EmbeddedResource Include="Resources/chat-interface.js">
+            <LogicalName>Flight.Resources.chat-interface.js</LogicalName>
+        </EmbeddedResource>
+    </ItemGroup>
+</Project>

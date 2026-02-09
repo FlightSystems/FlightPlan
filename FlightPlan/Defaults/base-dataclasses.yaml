@@ -1,0 +1,132 @@
+# ================================================================
+# BASE DATA CLASSES
+# Organizational Data Classification Catalog
+# ================================================================
+
+dataClasses:
+
+  # --------------------------------------------------------------
+  # PUBLIC / NON-SENSITIVE
+  # --------------------------------------------------------------
+
+  public:
+    description: Publicly available, non-sensitive information
+
+  internal:
+    description: Internal business information not intended for public release
+
+  # --------------------------------------------------------------
+  # PERSONAL DATA (GDPR / PRIVACY)
+  # --------------------------------------------------------------
+
+  personal_data:
+    description: Personally identifiable information (PII)
+
+  personal_profile:
+    description: User profile information (name, username, preferences)
+
+  contact_information:
+    description: Contact details (email, phone number, address)
+
+  identifiers:
+    description: Unique identifiers associated with individuals
+
+  # --------------------------------------------------------------
+  # SENSITIVE PERSONAL DATA
+  # --------------------------------------------------------------
+
+  sensitive_personal_data:
+    description: Highly sensitive personal information
+
+  authentication_data:
+    description: Authentication credentials (passwords, tokens, secrets)
+
+  biometric_data:
+    description: Biometric identifiers (fingerprints, facial data)
+
+  location_data:
+    description: Precise or historical location information
+
+  # --------------------------------------------------------------
+  # FINANCIAL / PAYMENT (PCI DSS)
+  # --------------------------------------------------------------
+
+  financial_data:
+    description: Financial account or transaction information
+
+  payment_card_data:
+    description: Payment card information (PCI regulated)
+
+  bank_account_data:
+    description: Bank account details
+
+  transaction_data:
+    description: Financial transaction records
+
+  # --------------------------------------------------------------
+  # HEALTH (HIPAA)
+  # --------------------------------------------------------------
+
+  health_data:
+    description: Health or medical information (PHI)
+
+  medical_records:
+    description: Detailed medical records or diagnoses
+
+  insurance_information:
+    description: Health insurance details
+
+  # --------------------------------------------------------------
+  # SECURITY / CREDENTIALS
+  # --------------------------------------------------------------
+
+  security_secrets:
+    description: Secrets used to secure systems or services
+
+  api_keys:
+    description: API keys and access tokens
+
+  encryption_keys:
+    description: Cryptographic keys
+
+  # --------------------------------------------------------------
+  # OPERATIONAL / SYSTEM DATA
+  # --------------------------------------------------------------
+
+  system_metadata:
+    description: System-generated metadata and identifiers
+
+  audit_logs:
+    description: Security or compliance audit logs
+
+  telemetry:
+    description: Metrics, traces, and monitoring data
+
+  usage_analytics:
+    description: Aggregated usage or behavioral analytics
+
+  # --------------------------------------------------------------
+  # BUSINESS / PROPRIETARY
+  # --------------------------------------------------------------
+
+  confidential_business_data:
+    description: Confidential business or operational data
+
+  intellectual_property:
+    description: Proprietary algorithms, source code, or designs
+
+  contracts:
+    description: Legal agreements and contracts
+
+  # --------------------------------------------------------------
+  # REGULATED / SPECIAL
+  # --------------------------------------------------------------
+
+  regulatory_data:
+    description: Data subject to regulatory requirements
+
+  export_controlled_data:
+    description: Data restricted by export control laws
+
+  government_data:
+    description: Government or public-sector regulated data

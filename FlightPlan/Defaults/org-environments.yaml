@@ -1,0 +1,15 @@
+# -------------------------------------------------------------------
+# ENVIRONMENTS
+# Logical deployment targets (no runtime semantics)
+# -------------------------------------------------------------------
+environments:
+  dev:
+    description: Development environment
+    promotesTo: staging
+
+  staging:
+    description: Staging environment
+    promotesTo: prod
+
+  prod:
+    description: Production environment

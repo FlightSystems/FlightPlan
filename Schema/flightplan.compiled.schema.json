@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flytdeck.io/schemas/flightplan.compiled.v1.json",
+  "title": "CompiledFlightPlan",
+  "type": "object",
+  "required": ["metadata", "application", "entities", "interfaces", "dependencies"],
+  "properties": {
+
+    "metadata": {
+      "type": "object",
+      "required": ["format", "compiledAt", "sourceFiles"],
+      "properties": {
+        "format": { "type": "string" },
+        "compiledAt": { "type": "string", "format": "date-time" },
+        "sourceFiles": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+
+    "application": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "domain": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+
+    "deliveryModel": {
+      "type": "object",
+      "properties": {
+        "hosting": { "type": "string" },
+        "serviceModel": { "type": "string" },
+        "tenancy": { "type": "string" },
+        "primaryUsers": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+
+    "entities": {
+      "type": "object",
+      "required": [
+        "zones",
+        "teams",
+        "tooling",
+        "platforms",
+        "dataClasses",
+        "resources",
+        "services"
+      ],
+      "properties": {
+
+        "zones": { "$ref": "#/$defs/entityArray" },
+        "teams": { "$ref": "#/$defs/entityArray" },
+        "tooling": { "$ref": "#/$defs/entityArray" },
+        "platforms": { "$ref": "#/$defs/entityArray" },
+        "dataClasses": { "$ref": "#/$defs/entityArray" },
+        "resources": { "$ref": "#/$defs/entityArray" },
+        "services": { "$ref": "#/$defs/entityArray" }
+      }
+    },
+
+    "interfaces": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/serviceExport" }
+    },
+
+    "dependencies": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/dependency" }
+    },
+
+    "annotations": {
+      "type": "object",
+      "additionalProperties": true
+    },
+
+    "toolchain": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+
+    "terms": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+
+  "$defs": {
+
+    "entityArray": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/baseEntity" }
+    },
+
+    "baseEntity": {
+      "type": "object",
+      "required": ["id", "type", "name"],
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "repoUrl": { "type": "string" },
+        "zoneRef": { "type": "string" },
+        "ownerRef": { "type": "string" },
+        "platformRef": { "type": "string" },
+        "dataClassRefs": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "foreignRefs": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "toolchain": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      },
+      "additionalProperties": true
+    },
+
+    "serviceExport": {
+      "type": "object",
+      "required": ["id", "serviceRef", "name", "protocol"],
+      "properties": {
+        "id": { "type": "string" },
+        "serviceRef": { "type": "string" },
+        "name": { "type": "string" },
+        "protocol": { "type": "string" },
+        "auth": { "type": "string" },
+        "visibility": { "type": "string" },
+        "dataClassRefs": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "consumers": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+
+    "dependency": {
+      "type": "object",
+      "required": ["from", "to", "kind"],
+      "properties": {
+        "from": { "type": "string" },
+        "to": { "type": "string" },
+        "kind": { "type": "string" },
+        "access": { "type": "string" },
+        "fromExportId": { "type": "string" },
+        "derivedFrom": { "type": "string" }
+      }
+    }
+  }
+}

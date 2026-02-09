@@ -1,0 +1,288 @@
+# ================================================================
+# BASE PLATFORMS
+# Cloud, Technology, and SaaS
+# ================================================================
+
+platforms:
+
+  # --------------------------------------------------------------
+  # CLOUD PROVIDERS
+  # --------------------------------------------------------------
+
+  aws:
+    description: Amazon Web Services
+    category: cloud
+
+  azure:
+    description: Microsoft Azure
+    category: cloud
+
+  gcp:
+    description: Google Cloud Platform
+    category: cloud
+
+  # --------------------------------------------------------------
+  # AWS SERVICES (COMMON)
+  # --------------------------------------------------------------
+
+  aws/ec2:
+    description: Amazon EC2
+    category: cloud
+    service: compute
+
+  aws/ecs:
+    description: Amazon ECS
+    category: cloud
+    service: compute
+
+  aws/eks:
+    description: Amazon EKS
+    category: cloud
+    service: compute
+
+  aws/lambda:
+    description: AWS Lambda
+    category: cloud
+    service: compute
+
+  aws/rds-postgresql:
+    description: Amazon RDS for PostgreSQL
+    category: cloud
+    service: database
+
+  aws/dynamodb:
+    description: Amazon DynamoDB
+    category: cloud
+    service: database
+
+  aws/s3:
+    description: Amazon S3
+    category: cloud
+    service: storage
+
+  aws/sqs:
+    description: Amazon SQS
+    category: cloud
+    service: messaging
+
+  aws/sns:
+    description: Amazon SNS
+    category: cloud
+    service: messaging
+
+  # --------------------------------------------------------------
+  # AZURE SERVICES (COMMON)
+  # --------------------------------------------------------------
+
+  azure/app-service:
+    description: Azure App Service
+    category: cloud
+    service: compute
+
+  azure/functions:
+    description: Azure Functions
+    category: cloud
+    service: compute
+
+  azure/sql:
+    description: Azure SQL Database
+    category: cloud
+    service: database
+
+  azure/cosmosdb:
+    description: Azure Cosmos DB
+    category: cloud
+    service: database
+
+  azure/blob-storage:
+    description: Azure Blob Storage
+    category: cloud
+    service: storage
+
+  # --------------------------------------------------------------
+  # GCP SERVICES (COMMON)
+  # --------------------------------------------------------------
+
+  gcp/compute-engine:
+    description: Google Compute Engine
+    category: cloud
+    service: compute
+
+  gcp/cloud-run:
+    description: Google Cloud Run
+    category: cloud
+    service: compute
+
+  gcp/cloud-functions:
+    description: Google Cloud Functions
+    category: cloud
+    service: compute
+
+  gcp/cloud-sql-postgresql:
+    description: Google Cloud SQL for PostgreSQL
+    category: cloud
+    service: database
+
+  gcp/bigquery:
+    description: Google BigQuery
+    category: cloud
+    service: analytics
+
+  gcp/pubsub:
+    description: Google Pub/Sub
+    category: cloud
+    service: messaging
+
+  # --------------------------------------------------------------
+  # RUNTIMES / LANGUAGES
+  # --------------------------------------------------------------
+
+  dotnet/8:
+    description: .NET 8 Runtime
+    category: tech
+    service: runtime
+
+  dotnet/7:
+    description: .NET 7 Runtime
+    category: tech
+    service: runtime
+
+  java/21:
+    description: Java 21 (LTS)
+    category: tech
+    service: runtime
+
+  python/3.12:
+    description: Python 3.12
+    category: tech
+    service: runtime
+
+  nodejs/20:
+    description: Node.js 20 (LTS)
+    category: tech
+    service: runtime
+
+  go/1.22:
+    description: Go 1.22
+    category: tech
+    service: runtime
+
+  # --------------------------------------------------------------
+  # FRONTEND FRAMEWORKS
+  # --------------------------------------------------------------
+
+  react/18:
+    description: React 18
+    category: tech
+    service: frontend
+
+  vue/3:
+    description: Vue.js 3
+    category: tech
+    service: frontend
+
+  angular/17:
+    description: Angular 17
+    category: tech
+    service: frontend
+
+  svelte/4:
+    description: Svelte 4
+    category: tech
+    service: frontend
+
+  # --------------------------------------------------------------
+  # DATA / INFRA TOOLS
+  # --------------------------------------------------------------
+
+  postgres:
+    description: PostgreSQL
+    category: tech
+    service: database
+
+  mysql:
+    description: MySQL
+    category: tech
+    service: database
+
+  redis:
+    description: Redis
+    category: tech
+    service: cache
+
+  kafka:
+    description: Apache Kafka
+    category: tech
+    service: messaging
+
+  rabbitmq:
+    description: RabbitMQ
+    category: tech
+    service: messaging
+
+  # --------------------------------------------------------------
+  # SAAS – CORE BUSINESS
+  # --------------------------------------------------------------
+
+  stripe/payments:
+    description: Stripe Payments
+    category: saas
+    service: payments
+
+  paypal:
+    description: PayPal
+    category: saas
+    service: payments
+
+  auth0:
+    description: Auth0 Identity Platform
+    category: saas
+    service: identity
+
+  okta:
+    description: Okta Identity Platform
+    category: saas
+    service: identity
+
+  # --------------------------------------------------------------
+  # SAAS – OBSERVABILITY
+  # --------------------------------------------------------------
+
+  datadog:
+    description: Datadog Observability Platform
+    category: saas
+    service: observability
+
+  newrelic:
+    description: New Relic Observability
+    category: saas
+    service: observability
+
+  splunk:
+    description: Splunk
+    category: saas
+    service: observability
+
+  # --------------------------------------------------------------
+  # SAAS – DEV / COLLABORATION
+  # --------------------------------------------------------------
+
+  github:
+    description: GitHub
+    category: saas
+    service: devtools
+
+  gitlab:
+    description: GitLab
+    category: saas
+    service: devtools
+
+  jira:
+    description: Atlassian Jira
+    category: saas
+    service: project-management
+
+  confluence:
+    description: Atlassian Confluence
+    category: saas
+    service: documentation

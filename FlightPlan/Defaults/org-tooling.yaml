@@ -1,0 +1,30 @@
+# -------------------------------------------------------------------
+# TOOLING (development & operations systems)
+# -------------------------------------------------------------------
+# Tooling entities describe systems used to build, ship, operate, and support
+# this application (source control, CI/CD, observability, on-call, work tracking, etc.).
+#
+# These are informational and used by reports; they are not deployment resources.
+#
+tooling:
+  github:
+    type: source-control
+    description: Source control and repositories
+    provider: GitHub
+    zone: zone://external
+    url: https://github.com/<your-org>
+
+  ci:
+    type: ci-cd
+    description: Continuous integration / delivery
+    zone: zone://external
+
+  observability:
+    type: observability
+    description: Logs, metrics, and tracing platform
+    zone: zone://internal
+
+  oncall:
+    type: on-call
+    description: Paging / incident response routing
+    zone: zone://external
