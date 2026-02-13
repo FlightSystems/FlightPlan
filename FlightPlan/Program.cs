@@ -205,10 +205,35 @@ public static class Program
             IsRequired = false
         };
         
+        var serveStoreTypeOpt = new Option<string>(
+            name: "--store-type",
+            description: "Vector store type: json (default) or falkordb")
+        {
+            IsRequired = false
+        };
+        serveStoreTypeOpt.SetDefaultValue("json");
+
+        var serveConnectionStringOpt = new Option<string?>(
+            name: "--connection-string",
+            description: "Connection string (for falkordb: host:port, for json: file path)")
+        {
+            IsRequired = false
+        };
+
+        var serveIndexNameOpt = new Option<string?>(
+            name: "--index-name",
+            description: "Index/graph name to query (for falkordb, auto-detects if not specified)")
+        {
+            IsRequired = false
+        };
+
         serveCmd.AddArgument(serveDirArg);
         serveCmd.AddOption(servePortOpt);
         serveCmd.AddOption(serveOpenOpt);
-        ServeCommand.Configure(serveCmd, serveDirArg, servePortOpt, serveOpenOpt);
+        serveCmd.AddOption(serveStoreTypeOpt);
+        serveCmd.AddOption(serveConnectionStringOpt);
+        serveCmd.AddOption(serveIndexNameOpt);
+        ServeCommand.Configure(serveCmd, serveDirArg, servePortOpt, serveOpenOpt, serveStoreTypeOpt, serveConnectionStringOpt, serveIndexNameOpt);
 
         // ------------------------------------------------------------
         // INDEX (AI/RAG)
@@ -257,13 +282,38 @@ public static class Program
             IsRequired = false
         };
 
+        var storeTypeOpt = new Option<string>(
+            name: "--store-type",
+            description: "Vector store type: json (default) or falkordb")
+        {
+            IsRequired = false
+        };
+        storeTypeOpt.SetDefaultValue("json");
+
+        var connectionStringOpt = new Option<string?>(
+            name: "--connection-string",
+            description: "Connection string (for falkordb: host:port, for json: file path)")
+        {
+            IsRequired = false
+        };
+
+        var indexNameOpt = new Option<string?>(
+            name: "--index-name",
+            description: "Index/graph name (for falkordb, auto-derived from application name if not specified)")
+        {
+            IsRequired = false
+        };
+
         indexCmd.AddArgument(indexInputArg);
         indexCmd.AddOption(indexOllamaUrlOpt);
         indexCmd.AddOption(embeddingModelOpt);
         indexCmd.AddOption(rebuildOpt);
         indexCmd.AddOption(includeDocsOpt);
         indexCmd.AddOption(baseUrlOpt);
-        IndexCommand.Configure(indexCmd, indexInputArg, indexOllamaUrlOpt, embeddingModelOpt, rebuildOpt, includeDocsOpt, baseUrlOpt);
+        indexCmd.AddOption(storeTypeOpt);
+        indexCmd.AddOption(connectionStringOpt);
+        indexCmd.AddOption(indexNameOpt);
+        IndexCommand.Configure(indexCmd, indexInputArg, indexOllamaUrlOpt, embeddingModelOpt, rebuildOpt, includeDocsOpt, baseUrlOpt, storeTypeOpt, connectionStringOpt, indexNameOpt);
 
         // ------------------------------------------------------------
         // QUERY (AI/Ollama)
@@ -274,14 +324,6 @@ public static class Program
         var queryArg = new Argument<string>(
             name: "question",
             description: "Question to ask about the FlightPlan");
-
-        var compiledJsonQueryOpt = new Option<FileInfo?>(
-            name: "--file",
-            description: "Compiled FlightPlan JSON file (optional - reads from index or auto-discovers)")
-        {
-            IsRequired = false
-        };
-        compiledJsonQueryOpt.AddAlias("-f");
 
         var modelOpt = new Option<string>(
             name: "--model",
@@ -330,15 +372,39 @@ public static class Program
         };
         topKOpt.SetDefaultValue(5);
 
+        var queryStoreTypeOpt = new Option<string>(
+            name: "--store-type",
+            description: "Vector store type: json (default) or falkordb")
+        {
+            IsRequired = false
+        };
+        queryStoreTypeOpt.SetDefaultValue("json");
+
+        var queryConnectionStringOpt = new Option<string?>(
+            name: "--connection-string",
+            description: "Connection string (for falkordb: host:port, for json: file path)")
+        {
+            IsRequired = false
+        };
+
+        var queryIndexNameOpt = new Option<string?>(
+            name: "--index-name",
+            description: "Index/graph name to query (for falkordb, auto-detects if not specified)")
+        {
+            IsRequired = false
+        };
+
         queryCmd.AddArgument(queryArg);
-        queryCmd.AddOption(compiledJsonQueryOpt);
         queryCmd.AddOption(modelOpt);
         queryCmd.AddOption(ollamaUrlOpt);
         queryCmd.AddOption(streamOpt);
         queryCmd.AddOption(maxTokensOpt);
         queryCmd.AddOption(queryEmbeddingModelOpt);
         queryCmd.AddOption(topKOpt);
-        QueryCommand.Configure(queryCmd, compiledJsonQueryOpt, queryArg, modelOpt, ollamaUrlOpt, streamOpt, maxTokensOpt, queryEmbeddingModelOpt, topKOpt);
+        queryCmd.AddOption(queryStoreTypeOpt);
+        queryCmd.AddOption(queryConnectionStringOpt);
+        queryCmd.AddOption(queryIndexNameOpt);
+        QueryCommand.Configure(queryCmd, queryArg, modelOpt, ollamaUrlOpt, streamOpt, maxTokensOpt, queryEmbeddingModelOpt, topKOpt, queryStoreTypeOpt, queryConnectionStringOpt, queryIndexNameOpt);
 
         // ------------------------------------------------------------
         // Wire up

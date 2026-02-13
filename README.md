@@ -201,19 +201,26 @@ Outputs can be archived or attached to pull requests and documentation sites.
 
 ### AI-Powered Queries (RAG System)
 
-Query your FlightPlan architecture using natural language via Ollama with semantic search:
+Query your FlightPlan architecture using natural language via Ollama with semantic search and optional graph database support:
 
 ```bash
 # First, build your compiled FlightPlan
 flightplan build flightplan.yml -o flightplan.compiled.json
 
-# Build vector index (one-time, ~30 seconds)
+# Build vector index (one-time, ~30 seconds) - JSON store (default)
 flightplan index flightplan.compiled.json
 
+# Or use FalkorDB for graph-enhanced queries and production deployments
+docker run -d -p 6379:6379 falkordb/falkordb
+flightplan index flightplan.compiled.json --store-type falkordb
+
 # Query with AI and semantic retrieval
-flightplan query flightplan.compiled.json "What services run in production?"
-flightplan query flightplan.compiled.json "Tell me about api-gateway-payer"
-flightplan query flightplan.compiled.json "Which team owns the SecurityApi service?"
+flightplan query "What services run in production?"
+flightplan query "Tell me about api-gateway-payer"
+flightplan query "Which team owns the SecurityApi service?"
+
+# Graph-enhanced queries with FalkorDB
+flightplan query "What services depend on SecurityApi?" --store-type falkordb
 ```
 
 **How it works:**
@@ -221,13 +228,23 @@ flightplan query flightplan.compiled.json "Which team owns the SecurityApi servi
 2. The `query` command finds the most relevant chunks for your question
 3. Only relevant context is sent to the AI (2-3KB instead of full 100KB)
 4. Results are accurate and fast, with no hallucination
+5. **FalkorDB** adds graph relationships for dependency and ownership queries
+
+**Store Options:**
+- **JSON** (default) - Simple file-based store, great for development
+- **FalkorDB** - Graph database with vector search, ideal for production
+  - ✅ Visual graph of your architecture
+  - ✅ Cypher queries for dependency analysis
+  - ✅ Team ownership visualization
+  - ✅ Impact analysis and deployment planning
 
 **Prerequisites:**
 - Install [Ollama](https://ollama.ai)
 - Pull models: `ollama pull nomic-embed-text` and `ollama pull llama3.2`
 - Start Ollama: `ollama serve`
+- (Optional) For FalkorDB: `docker run -d -p 6379:6379 falkordb/falkordb`
 
-See the [RAG Implementation Guide](Docs/RAG-Implementation.md) for details.
+See the [RAG Implementation Guide](Docs/RAG-Implementation.md), [FalkorDB Integration Guide](Docs/FalkorDB-Integration.md), and [Graph Visualization Guide](Docs/Graph-Visualization-Guide.md) for details.
 
 ---
 

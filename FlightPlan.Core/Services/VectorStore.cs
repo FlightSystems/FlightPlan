@@ -4,13 +4,15 @@ using FlightPlan.Models;
 namespace FlightPlan.Services;
 
 /// <summary>
-/// Simple in-memory vector store with persistence
+/// Simple in-memory vector store with JSON file persistence
 /// </summary>
-public class VectorStore
+public class VectorStore : IVectorStore
 {
     private List<FlightPlanChunk> _chunks = new();
     private readonly string _indexPath;
     private VectorStoreMetadata? _metadata;
+
+    public string StoreType => "json";
 
     public VectorStore(string indexPath = ".flightplan.index.json")
     {
@@ -289,6 +291,7 @@ public class VectorStoreMetadata
     public int ChunkCount { get; set; }
     public bool IncludesDocumentation { get; set; }
     public string? BaseUrl { get; set; }
+    public string? GraphName { get; set; }
 }
 
 public class VectorStoreIndex

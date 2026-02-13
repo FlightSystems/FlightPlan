@@ -10,55 +10,82 @@ internal static class QueryCommand
 {
     internal static void Configure(
         Command queryCmd,
-        Option<FileInfo?> compiledJsonOpt,
         Argument<string> queryArg,
         Option<string> modelOpt,
         Option<string> ollamaUrlOpt,
         Option<bool> streamOpt,
         Option<int?> maxTokensOpt,
         Option<string> embeddingModelOpt,
-        Option<int> topKOpt)
+        Option<int> topKOpt,
+        Option<string> storeTypeOpt,
+        Option<string?> connectionStringOpt,
+        Option<string?> indexNameOpt)
     {
-        queryCmd.SetHandler(async (FileInfo? compiledJson, string query, string model, string ollamaUrl, bool stream, int? maxTokens, string embeddingModel, int topK) =>
+        queryCmd.SetHandler(async (context) =>
         {
-            // If no file provided, try to get from index or auto-discover
-            FileInfo? resolvedFile = compiledJson;
-            
-            if (resolvedFile == null)
-            {
-                resolvedFile = await TryResolveFlightPlanFile();
-                if (resolvedFile == null)
-                {
-                    Console.Error.WriteLine("❌ No FlightPlan file specified and couldn't auto-discover one.");
-                    Console.Error.WriteLine("\nOptions:");
-                    Console.Error.WriteLine("  1. Specify the file: flight query <path-to-json> \"your question\"");
-                    Console.Error.WriteLine("  2. Create flightplan.compiled.json in current directory");
-                    Console.Error.WriteLine("  3. Index a file first: flight index <path-to-json>");
-                    Environment.Exit(1);
-                }
-                Console.WriteLine($"📄 Using FlightPlan: {Path.GetFileName(resolvedFile.FullName)}");
-            }
-            else
-            {
-                CliHelpers.EnsureFileExists(resolvedFile, "Compiled FlightPlan JSON file");
-            }
+            var query = context.ParseResult.GetValueForArgument(queryArg);
+            var model = context.ParseResult.GetValueForOption(modelOpt) ?? "llama3.2";
+            var ollamaUrl = context.ParseResult.GetValueForOption(ollamaUrlOpt) ?? "http://localhost:11434";
+            var stream = context.ParseResult.GetValueForOption(streamOpt);
+            var maxTokens = context.ParseResult.GetValueForOption(maxTokensOpt);
+            var embeddingModel = context.ParseResult.GetValueForOption(embeddingModelOpt) ?? "nomic-embed-text";
+            var topK = context.ParseResult.GetValueForOption(topKOpt);
+            var storeType = context.ParseResult.GetValueForOption(storeTypeOpt) ?? "json";
+            var connectionString = context.ParseResult.GetValueForOption(connectionStringOpt);
+            var indexName = context.ParseResult.GetValueForOption(indexNameOpt);
 
-            // Check if index exists
-            var store = new VectorStore();
-            if (!store.IndexExists())
+            // Validate store type
+            if (!VectorStoreFactory.IsSupported(storeType))
             {
-                Console.Error.WriteLine("❌ No index found. Please run 'flight index' first:");
-                Console.Error.WriteLine($"   flight index {resolvedFile.Name}");
+                Console.Error.WriteLine($"❌ Unknown store type: {storeType}");
+                Console.Error.WriteLine($"   Supported types: {string.Join(", ", VectorStoreFactory.SupportedTypes)}");
                 Environment.Exit(1);
             }
 
-            Console.WriteLine($"🔍 Searching for relevant context...");
+            // Check if index exists - try with provided name first, then try to auto-detect
+            var store = VectorStoreFactory.Create(storeType, connectionString, indexName);
+            
+            if (!store.IndexExists() && storeType == "falkordb" && string.IsNullOrEmpty(indexName))
+            {
+                // Try to find an index by checking metadata of common graph names
+                Console.WriteLine("🔍 Searching for available indexes...");
+                var foundIndex = await TryFindFalkorDBIndex(connectionString);
+                if (foundIndex != null)
+                {
+                    Console.WriteLine($"   Found index: {foundIndex}");
+                    store = VectorStoreFactory.Create(storeType, connectionString, foundIndex);
+                }
+            }
+            if (!store.IndexExists())
+            {
+                var storeName = storeType == "falkordb" && indexName != null ? $" '{indexName}'" : "";
+                Console.Error.WriteLine($"❌ No index{storeName} found for {storeType} store. Please run 'flight index' first:");
+                Console.Error.WriteLine($"   Example: flight index <compiled-json> --store-type {storeType}");
+                if (storeType == "falkordb")
+                {
+                    Console.Error.WriteLine($"   Make sure FalkorDB is running at {connectionString ?? "localhost:6379"}");
+                    if (!string.IsNullOrEmpty(indexName))
+                    {
+                        Console.Error.WriteLine($"   Or use --index-name to specify a different index");
+                    }
+                }
+                Environment.Exit(1);
+            }
+
+            var storeInfo = storeType == "falkordb" && indexName != null ? $"{storeType.ToUpper()} ({indexName})" : storeType.ToUpper();
+            Console.WriteLine($"🔍 Searching for relevant context in {storeInfo} store...");
             
             try
             {
-                // Get metadata for base URL
+                // Get metadata for base URL and display info
                 var metadata = await store.GetMetadata();
                 var baseUrl = metadata?.BaseUrl;
+                
+                // Show which FlightPlan is being queried (from index metadata)
+                if (metadata != null && !string.IsNullOrEmpty(metadata.SourceFile))
+                {
+                    Console.WriteLine($"   FlightPlan: {Path.GetFileName(metadata.SourceFile)}");
+                }
                 
                 // Search for relevant chunks
                 var relevantChunks = await store.Search(query, ollamaUrl, embeddingModel, topK);
@@ -67,10 +94,10 @@ internal static class QueryCommand
                 Console.WriteLine($"   Top match: {relevantChunks[0].Id} (score: {relevantChunks[0].Score:F3})\n");
 
                 // Build context from chunks
-                var context = BuildContext(relevantChunks, baseUrl);
+                var contextText = BuildContext(relevantChunks, baseUrl);
                 
                 // Build the system prompt with relevant context only
-                var systemPrompt = BuildSystemPrompt(context);
+                var systemPrompt = BuildSystemPrompt(contextText);
 
                 // Send query to Ollama
                 Console.WriteLine($"🤖 Querying {model} via Ollama...\n");
@@ -106,40 +133,7 @@ internal static class QueryCommand
                 Environment.Exit(1);
             }
 
-        }, compiledJsonOpt, queryArg, modelOpt, ollamaUrlOpt, streamOpt, maxTokensOpt, embeddingModelOpt, topKOpt);
-    }
-
-    private static async Task<FileInfo?> TryResolveFlightPlanFile()
-    {
-        // 1. Try to get from index metadata
-        var store = new VectorStore();
-        if (store.IndexExists())
-        {
-            var metadata = await store.GetMetadata();
-            if (metadata != null && File.Exists(metadata.SourceFile))
-            {
-                return new FileInfo(metadata.SourceFile);
-            }
-        }
-
-        // 2. Look for flightplan.compiled.json in current directory
-        var currentDir = Directory.GetCurrentDirectory();
-        var commonNames = new[] 
-        { 
-            "flightplan.compiled.json",
-            "docs/flightplan/flightplan.compiled.json"
-        };
-
-        foreach (var name in commonNames)
-        {
-            var path = Path.Combine(currentDir, name);
-            if (File.Exists(path))
-            {
-                return new FileInfo(path);
-            }
-        }
-
-        return null;
+        });
     }
 
     private static string BuildContext(List<FlightPlanChunk> chunks, string? baseUrl)
@@ -309,6 +303,28 @@ When analyzing the context, consider:
                 // Skip malformed lines
                 continue;
             }
+        }
+    }
+
+    /// <summary>
+    /// Try to find an existing FalkorDB index by checking for graphs with metadata
+    /// </summary>
+    private static async Task<string?> TryFindFalkorDBIndex(string? connectionString)
+    {
+        try
+        {
+            var store = VectorStoreFactory.Create("falkordb", connectionString, "flightplan");
+            if (store.IndexExists())
+            {
+                return "flightplan";
+            }
+            
+            // Could add logic here to scan for other graphs if needed
+            return null;
+        }
+        catch
+        {
+            return null;
         }
     }
 

@@ -8,6 +8,8 @@
 
   <ItemGroup>
     <PackageReference Include="Markdig" Version="0.41.0" />
+    <PackageReference Include="StackExchange.Redis" Version="2.8.16" />
+    <PackageReference Include="Microsoft.SemanticKernel" Version="1.32.0" />
   </ItemGroup>
 
 </Project>

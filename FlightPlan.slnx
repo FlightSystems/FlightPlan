@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="FlightPlan/FlightPlan.csproj" />
+  <Project Path="FlightPlan.Core/FlightPlan.Core.csproj" />
+</Solution>

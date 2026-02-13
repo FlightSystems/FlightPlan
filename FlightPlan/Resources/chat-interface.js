@@ -20,16 +20,85 @@ const chatMessages = document.getElementById('chat-messages');
 const chatInput = document.getElementById('chat-input');
 const chatSend = document.getElementById('chat-send');
 
+let graphEnabled = false;
+let graphStats = null;
+
+// Check if graph capabilities are enabled
+async function checkGraphEnabled() {
+    try {
+        const response = await fetch('/api/graph/enabled');
+        const result = await response.json();
+        graphEnabled = result.enabled;
+        
+        if (graphEnabled) {
+            console.log('🔮 Graph queries enabled:', result.storeType, result.indexName);
+            await loadGraphStatistics();
+            addGraphBadge();
+        }
+    } catch (error) {
+        console.log('Graph queries not available');
+    }
+}
+
+async function loadGraphStatistics() {
+    try {
+        const response = await fetch('/api/graph/statistics');
+        if (response.ok) {
+            graphStats = await response.json();
+            console.log('📊 Graph statistics loaded:', graphStats);
+        }
+    } catch (error) {
+        console.error('Failed to load graph statistics:', error);
+    }
+}
+
+function addGraphBadge() {
+    const badge = document.createElement('div');
+    badge.style.cssText = 'position: absolute; top: 10px; right: 60px; background: #10b981; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: bold;';
+    badge.textContent = '📊 Graph';
+    badge.title = 'Graph query capabilities enabled';
+    document.querySelector('#chat-modal .chat-header').appendChild(badge);
+}
+
+// Initialize on load
+checkGraphEnabled();
+
 chatButton.addEventListener('click', () => {
     chatModal.classList.toggle('show');
     if (chatModal.classList.contains('show')) {
         chatInput.focus();
+        if (graphEnabled && graphStats) {
+            showGraphWelcome();
+        }
     }
 });
 
 chatClose.addEventListener('click', () => {
     chatModal.classList.remove('show');
 });
+
+function showGraphWelcome() {
+    // Only show once per session
+    if (sessionStorage.getItem('graphWelcomeShown')) return;
+    sessionStorage.setItem('graphWelcomeShown', 'true');
+    
+    const welcomeMessage = document.createElement('div');
+    welcomeMessage.className = 'chat-message assistant markdown-body';
+    welcomeMessage.innerHTML = `
+        <strong>📊 Graph Query Mode Active</strong><br><br>
+        I can answer questions using the FlightPlan graph database:<br>
+        <ul>
+            <li>🔗 <strong>${graphStats.nodeCount}</strong> nodes (Services, Teams, Resources)</li>
+            <li>🔄 <strong>${graphStats.relationshipCount}</strong> relationships</li>
+        </ul>
+        <br>
+        Try asking: 
+        <em>"What services depend on X?"</em>, 
+        <em>"Show me what the backend team owns"</em>, or
+        <em>"What would break if service Y fails?"</em>
+    `;
+    chatMessages.appendChild(welcomeMessage);
+}
 
 async function sendMessage() {
     const query = chatInput.value.trim();

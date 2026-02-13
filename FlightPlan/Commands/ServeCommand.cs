@@ -19,17 +19,29 @@ internal static class ServeCommand
     private static readonly string StylesTemplate = ReadEmbeddedResource("Flight.Resources.serve-styles.css");
     private static readonly string ChatScriptTemplate = ReadEmbeddedResource("Flight.Resources.chat-interface.js");
 
+    // Store configuration for API handlers
+    private static string? _storeType;
+    private static string? _connectionString;
+    private static string? _indexName;
+    private static OpenAIConfiguration? _openAIConfig;
+
     internal static void Configure(
         Command serveCmd,
         Argument<DirectoryInfo> dirArg,
         Option<int> portOpt,
-        Option<bool> openOpt)
+        Option<bool> openOpt,
+        Option<string> storeTypeOpt,
+        Option<string?> connectionStringOpt,
+        Option<string?> indexNameOpt)
     {
         serveCmd.SetHandler((InvocationContext ctx) =>
         {
             var dir = ctx.ParseResult.GetValueForArgument(dirArg);
             var port = ctx.ParseResult.GetValueForOption(portOpt);
             var open = ctx.ParseResult.GetValueForOption(openOpt);
+            var storeType = ctx.ParseResult.GetValueForOption(storeTypeOpt) ?? "json";
+            var connectionString = ctx.ParseResult.GetValueForOption(connectionStringOpt);
+            var indexName = ctx.ParseResult.GetValueForOption(indexNameOpt);
 
             if (!dir.Exists)
             {
@@ -38,14 +50,42 @@ internal static class ServeCommand
                 return;
             }
 
-            Execute(dir, port, open);
+            Execute(dir, port, open, storeType, connectionString, indexName);
         });
     }
 
-    private static void Execute(DirectoryInfo dir, int port, bool open)
+    private static void Execute(DirectoryInfo dir, int port, bool open, string storeType, string? connectionString, string? indexName)
     {
+        // Store configuration for API handlers
+        _storeType = storeType;
+        _connectionString = connectionString;
+        _indexName = indexName;
+        
+        // Load OpenAI configuration from environment
+        _openAIConfig = OpenAIConfiguration.FromEnvironment();
+
         Console.WriteLine($"🚀 Starting Flight documentation server...");
         Console.WriteLine($"📁 Serving from: {dir.FullName}");
+        if (storeType != "json")
+        {
+            Console.WriteLine($"🗄️  Vector store: {storeType.ToUpper()}");
+            if (!string.IsNullOrEmpty(indexName))
+            {
+                Console.WriteLine($"📇 Index name: {indexName}");
+            }
+        }
+        
+        // Display MCP function calling status
+        if (_openAIConfig?.IsConfigured() == true)
+        {
+            Console.WriteLine($"🤖 AI Mode: {(_openAIConfig.UseMcpFunctionCalling ? "MCP Function Calling" : "Legacy RAG Pre-injection")}");
+            Console.WriteLine($"🔗 OpenAI: {(_openAIConfig.Endpoint.Contains("azure") ? "Azure OpenAI" : "OpenAI")} ({_openAIConfig.Model})");
+        }
+        else
+        {
+            Console.WriteLine($"🤖 AI Mode: Ollama (Legacy RAG Pre-injection)");
+        }
+        
         Console.WriteLine();
         Console.WriteLine("Press Ctrl+C to stop the server.");
         Console.WriteLine();
@@ -171,6 +211,30 @@ internal static class ServeCommand
         {
             await HandleQueryStreamApi(context);
         }
+        else if (path == "/api/graph/query" && request.HttpMethod == "POST")
+        {
+            await HandleGraphQueryApi(context);
+        }
+        else if (path == "/api/graph/statistics" && request.HttpMethod == "GET")
+        {
+            await HandleGraphStatisticsApi(context);
+        }
+        else if (path.StartsWith("/api/graph/service/") && request.HttpMethod == "GET")
+        {
+            await HandleGraphServiceApi(context, path);
+        }
+        else if (path.StartsWith("/api/graph/team/") && request.HttpMethod == "GET")
+        {
+            await HandleGraphTeamApi(context, path);
+        }
+        else if (path == "/api/graph/patterns" && request.HttpMethod == "GET")
+        {
+            await HandleGraphPatternsApi(context);
+        }
+        else if (path == "/api/graph/enabled" && request.HttpMethod == "GET")
+        {
+            await HandleGraphEnabledApi(context);
+        }
         else if (path == "/api/mcp" && request.HttpMethod == "POST")
         {
             var mcpService = CreateMcpService();
@@ -214,9 +278,33 @@ internal static class ServeCommand
                 return;
             }
 
-            var queryService = new QueryService();
-            // Use root-relative URLs for local serving instead of GitHub URLs
-            var result = await queryService.QueryAsync(queryRequest.Query, baseUrlOverride: "/");
+            QueryResponse result;
+            
+            // Check if OpenAI is configured and MCP function calling is enabled
+            if (_openAIConfig?.IsConfigured() == true && _openAIConfig.UseMcpFunctionCalling)
+            {
+                // Use new MCP function calling mode
+                var queryService = new McpQueryService(
+                    openAiEndpoint: _openAIConfig.Endpoint,
+                    openAiKey: _openAIConfig.ApiKey,
+                    openAiModel: _openAIConfig.Model,
+                    storeType: _storeType ?? "json",
+                    connectionString: _connectionString,
+                    indexName: _indexName);
+                    
+                result = await queryService.QueryAsync(queryRequest.Query);
+            }
+            else
+            {
+                // Use legacy RAG pre-injection mode
+                var queryService = new QueryService(
+                    storeType: _storeType ?? "json",
+                    connectionString: _connectionString,
+                    indexName: _indexName);
+                    
+                // Use root-relative URLs for local serving instead of GitHub URLs
+                result = await queryService.QueryAsync(queryRequest.Query, baseUrlOverride: "/");
+            }
 
             response.ContentType = "application/json";
             response.StatusCode = 200;
@@ -264,14 +352,42 @@ internal static class ServeCommand
             response.Headers.Add("Cache-Control", "no-cache");
             response.StatusCode = 200;
 
-            var queryService = new QueryService();
-            // Use root-relative URLs for local serving instead of GitHub URLs
-            await foreach (var token in queryService.QueryStreamingAsync(queryRequest.Query, baseUrlOverride: "/"))
+            // Check if OpenAI is configured and MCP function calling is enabled
+            if (_openAIConfig?.IsConfigured() == true && _openAIConfig.UseMcpFunctionCalling)
             {
-                var eventData = $"data: {JsonSerializer.Serialize(new { token }, JsonOptions)}\n\n";
-                var buffer = Encoding.UTF8.GetBytes(eventData);
-                response.OutputStream.Write(buffer, 0, buffer.Length);
-                response.OutputStream.Flush();
+                // Use new MCP function calling mode
+                var queryService = new McpQueryService(
+                    openAiEndpoint: _openAIConfig.Endpoint,
+                    openAiKey: _openAIConfig.ApiKey,
+                    openAiModel: _openAIConfig.Model,
+                    storeType: _storeType ?? "json",
+                    connectionString: _connectionString,
+                    indexName: _indexName);
+                    
+                await foreach (var token in queryService.QueryStreamingAsync(queryRequest.Query))
+                {
+                    var eventData = $"data: {JsonSerializer.Serialize(new { token }, JsonOptions)}\n\n";
+                    var buffer = Encoding.UTF8.GetBytes(eventData);
+                    response.OutputStream.Write(buffer, 0, buffer.Length);
+                    response.OutputStream.Flush();
+                }
+            }
+            else
+            {
+                // Use legacy RAG pre-injection mode
+                var queryService = new QueryService(
+                    storeType: _storeType ?? "json",
+                    connectionString: _connectionString,
+                    indexName: _indexName);
+                    
+                // Use root-relative URLs for local serving instead of GitHub URLs
+                await foreach (var token in queryService.QueryStreamingAsync(queryRequest.Query, baseUrlOverride: "/"))
+                {
+                    var eventData = $"data: {JsonSerializer.Serialize(new { token }, JsonOptions)}\n\n";
+                    var buffer = Encoding.UTF8.GetBytes(eventData);
+                    response.OutputStream.Write(buffer, 0, buffer.Length);
+                    response.OutputStream.Flush();
+                }
             }
 
             // Send done event
@@ -362,6 +478,88 @@ internal static class ServeCommand
             }
         };
 
+        // Add graph query tools if FalkorDB is enabled
+        if (_storeType == "falkordb")
+        {
+            tools.Add(new McpTool
+            {
+                Name = "query_graph",
+                Description = "Execute a Cypher query against the FlightPlan graph database to analyze services, dependencies, teams, and resources. Use this for complex queries about system architecture and relationships.",
+                InputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        query = new
+                        {
+                            type = "string",
+                            description = "Cypher query to execute (e.g., MATCH (s:Service) RETURN s.name)"
+                        },
+                        parameters = new
+                        {
+                            type = "object",
+                            description = "Optional parameters for the query (use $paramName in query)"
+                        }
+                    },
+                    required = new[] { "query" }
+                }
+            });
+
+            tools.Add(new McpTool
+            {
+                Name = "get_graph_statistics",
+                Description = "Get statistics about the FlightPlan graph including node counts and relationship counts by type.",
+                InputSchema = new
+                {
+                    type = "object",
+                    properties = new { }
+                }
+            });
+
+            tools.Add(new McpTool
+            {
+                Name = "analyze_service_dependencies",
+                Description = "Analyze dependencies for a specific service or resource, including what it depends on and what depends on it. Works with both services and resources (databases, messaging systems, etc.).",
+                InputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        serviceId = new
+                        {
+                            type = "string",
+                            description = "The service or resource ID to analyze (e.g., 'web-app-services-rest-claim-api' or 'data/xeodesigner')"
+                        },
+                        includeImpact = new
+                        {
+                            type = "boolean",
+                            description = "Include impact analysis (all services that would be affected)"
+                        }
+                    },
+                    required = new[] { "serviceId" }
+                }
+            });
+
+            tools.Add(new McpTool
+            {
+                Name = "get_team_ownership",
+                Description = "Get all services and resources owned by a specific team.",
+                InputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        teamId = new
+                        {
+                            type = "string",
+                            description = "The team ID to query"
+                        }
+                    },
+                    required = new[] { "teamId" }
+                }
+            });
+        }
+
         return Task.FromResult(new ListToolsResult { Tools = tools });
     }
 
@@ -378,6 +576,10 @@ internal static class ServeCommand
         {
             "query_documentation" => await HandleQueryDocumentationTool(callParams.Arguments),
             "list_documents" => await HandleListDocumentsTool(),
+            "query_graph" => await HandleQueryGraphTool(callParams.Arguments),
+            "get_graph_statistics" => await HandleGraphStatisticsTool(),
+            "analyze_service_dependencies" => await HandleServiceDependenciesTool(callParams.Arguments),
+            "get_team_ownership" => await HandleTeamOwnershipTool(callParams.Arguments),
             _ => McpProtocolService.CreateToolError($"Unknown tool: {callParams.Name}")
         };
     }
@@ -397,7 +599,10 @@ internal static class ServeCommand
 
         try
         {
-            var queryService = new QueryService();
+            var queryService = new QueryService(
+                storeType: _storeType ?? "json",
+                connectionString: _connectionString,
+                indexName: _indexName);
             var result = await queryService.QueryAsync(query);
 
             return McpProtocolService.CreateToolResult(result.Answer ?? "No response generated");
@@ -639,6 +844,457 @@ internal static class ServeCommand
                 }
             }
         });
+    }
+
+    // ============================================================
+    // Graph Query API Handlers
+    // ============================================================
+
+    private static async Task HandleGraphEnabledApi(HttpListenerContext context)
+    {
+        var response = context.Response;
+        response.ContentType = "application/json";
+        response.StatusCode = 200;
+        
+        var enabled = _storeType == "falkordb";
+        var resultJson = JsonSerializer.Serialize(new { enabled, storeType = _storeType, indexName = _indexName }, JsonOptions);
+        var buffer = Encoding.UTF8.GetBytes(resultJson);
+        response.ContentLength64 = buffer.Length;
+        response.OutputStream.Write(buffer, 0, buffer.Length);
+        response.Close();
+        HttpServerService.LogRequest(context.Request, 200);
+    }
+
+    private static async Task HandleGraphQueryApi(HttpListenerContext context)
+    {
+        var request = context.Request;
+        var response = context.Response;
+
+        if (_storeType != "falkordb")
+        {
+            response.StatusCode = 400;
+            response.ContentType = "application/json";
+            var errorJson = "{\"error\":\"Graph queries require FalkorDB store\"}";
+            var buffer = Encoding.UTF8.GetBytes(errorJson);
+            response.ContentLength64 = buffer.Length;
+            response.OutputStream.Write(buffer, 0, buffer.Length);
+            response.Close();
+            HttpServerService.LogRequest(request, 400);
+            return;
+        }
+
+        try
+        {
+            using var reader = new StreamReader(request.InputStream);
+            var json = await reader.ReadToEndAsync();
+            var queryRequest = JsonSerializer.Deserialize<GraphQueryRequest>(json, JsonOptions);
+
+            if (queryRequest == null || string.IsNullOrWhiteSpace(queryRequest.Query))
+            {
+                response.StatusCode = 400;
+                var errorJson = "{\"error\":\"Query is required\"}";
+                var buffer = Encoding.UTF8.GetBytes(errorJson);
+                response.ContentType = "application/json";
+                response.ContentLength64 = buffer.Length;
+                response.OutputStream.Write(buffer, 0, buffer.Length);
+                response.Close();
+                HttpServerService.LogRequest(request, 400);
+                return;
+            }
+
+            var store = VectorStoreFactory.Create(_storeType, _connectionString, _indexName) as FalkorDBVectorStore;
+            if (store == null)
+            {
+                throw new InvalidOperationException("Failed to create FalkorDB store");
+            }
+
+            var result = await store.ExecuteCypherQuery(queryRequest.Query, queryRequest.Parameters);
+
+            response.ContentType = "application/json";
+            response.StatusCode = 200;
+            var resultJson = JsonSerializer.Serialize(result, JsonOptions);
+            var resultBuffer = Encoding.UTF8.GetBytes(resultJson);
+            response.ContentLength64 = resultBuffer.Length;
+            response.OutputStream.Write(resultBuffer, 0, resultBuffer.Length);
+            response.Close();
+            HttpServerService.LogRequest(request, 200);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"❌ Graph Query API Error: {ex.Message}");
+            response.StatusCode = 500;
+            var errorJson = $"{{\"error\":\"{WebUtility.HtmlEncode(ex.Message)}\"}}";
+            var buffer = Encoding.UTF8.GetBytes(errorJson);
+            response.ContentType = "application/json";
+            response.ContentLength64 = buffer.Length;
+            response.OutputStream.Write(buffer, 0, buffer.Length);
+            response.Close();
+            HttpServerService.LogRequest(request, 500);
+        }
+    }
+
+    private static async Task HandleGraphStatisticsApi(HttpListenerContext context)
+    {
+        var response = context.Response;
+
+        if (_storeType != "falkordb")
+        {
+            response.StatusCode = 400;
+            response.ContentType = "application/json";
+            var errorJson = "{\"error\":\"Graph statistics require FalkorDB store\"}";
+            var buffer = Encoding.UTF8.GetBytes(errorJson);
+            response.ContentLength64 = buffer.Length;
+            response.OutputStream.Write(buffer, 0, buffer.Length);
+            response.Close();
+            HttpServerService.LogRequest(context.Request, 400);
+            return;
+        }
+
+        try
+        {
+            var store = VectorStoreFactory.Create(_storeType, _connectionString, _indexName) as FalkorDBVectorStore;
+            if (store == null)
+            {
+                throw new InvalidOperationException("Failed to create FalkorDB store");
+            }
+
+            var stats = await store.GetGraphStatistics();
+
+            response.ContentType = "application/json";
+            response.StatusCode = 200;
+            var resultJson = JsonSerializer.Serialize(stats, JsonOptions);
+            var resultBuffer = Encoding.UTF8.GetBytes(resultJson);
+            response.ContentLength64 = resultBuffer.Length;
+            response.OutputStream.Write(resultBuffer, 0, resultBuffer.Length);
+            response.Close();
+            HttpServerService.LogRequest(context.Request, 200);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"❌ Graph Statistics API Error: {ex.Message}");
+            response.StatusCode = 500;
+            var errorJson = $"{{\"error\":\"{WebUtility.HtmlEncode(ex.Message)}\"}}";
+            var buffer = Encoding.UTF8.GetBytes(errorJson);
+            response.ContentType = "application/json";
+            response.ContentLength64 = buffer.Length;
+            response.OutputStream.Write(buffer, 0, buffer.Length);
+            response.Close();
+            HttpServerService.LogRequest(context.Request, 500);
+        }
+    }
+
+    private static async Task HandleGraphServiceApi(HttpListenerContext context, string path)
+    {
+        var response = context.Response;
+        var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        
+        if (segments.Length < 3)
+        {
+            response.StatusCode = 400;
+            response.Close();
+            HttpServerService.LogRequest(context.Request, 400);
+            return;
+        }
+
+        var serviceId = WebUtility.UrlDecode(segments[2]);
+        var action = segments.Length > 3 ? segments[3] : "info";
+
+        try
+        {
+            var store = VectorStoreFactory.Create(_storeType ?? "json", _connectionString, _indexName) as FalkorDBVectorStore;
+            if (store == null)
+            {
+                throw new InvalidOperationException("FalkorDB store required");
+            }
+
+            object result = action switch
+            {
+                "dependencies" => await store.GetServiceDependencies(serviceId),
+                "dependents" => await store.GetServiceDependents(serviceId),
+                "impact" => await store.GetImpactAnalysis(serviceId),
+                _ => new { error = "Unknown action" }
+            };
+
+            response.ContentType = "application/json";
+            response.StatusCode = 200;
+            var resultJson = JsonSerializer.Serialize(result, JsonOptions);
+            var resultBuffer = Encoding.UTF8.GetBytes(resultJson);
+            response.ContentLength64 = resultBuffer.Length;
+            response.OutputStream.Write(resultBuffer, 0, resultBuffer.Length);
+            response.Close();
+            HttpServerService.LogRequest(context.Request, 200);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"❌ Graph Service API Error: {ex.Message}");
+            response.StatusCode = 500;
+            var errorJson = $"{{\"error\":\"{WebUtility.HtmlEncode(ex.Message)}\"}}";
+            var buffer = Encoding.UTF8.GetBytes(errorJson);
+            response.ContentType = "application/json";
+            response.ContentLength64 = buffer.Length;
+            response.OutputStream.Write(buffer, 0, buffer.Length);
+            response.Close();
+            HttpServerService.LogRequest(context.Request, 500);
+        }
+    }
+
+    private static async Task HandleGraphTeamApi(HttpListenerContext context, string path)
+    {
+        var response = context.Response;
+        var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        
+        if (segments.Length < 3)
+        {
+            response.StatusCode = 400;
+            response.Close();
+            HttpServerService.LogRequest(context.Request, 400);
+            return;
+        }
+
+        var teamId = WebUtility.UrlDecode(segments[2]);
+
+        try
+        {
+            var store = VectorStoreFactory.Create(_storeType ?? "json", _connectionString, _indexName) as FalkorDBVectorStore;
+            if (store == null)
+            {
+                throw new InvalidOperationException("FalkorDB store required");
+            }
+
+            var ownership = await store.GetTeamOwnership(teamId);
+
+            response.ContentType = "application/json";
+            response.StatusCode = 200;
+            var resultJson = JsonSerializer.Serialize(ownership, JsonOptions);
+            var resultBuffer = Encoding.UTF8.GetBytes(resultJson);
+            response.ContentLength64 = resultBuffer.Length;
+            response.OutputStream.Write(resultBuffer, 0, resultBuffer.Length);
+            response.Close();
+            HttpServerService.LogRequest(context.Request, 200);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"❌ Graph Team API Error: {ex.Message}");
+            response.StatusCode = 500;
+            var errorJson = $"{{\"error\":\"{WebUtility.HtmlEncode(ex.Message)}\"}}";
+            var buffer = Encoding.UTF8.GetBytes(errorJson);
+            response.ContentType = "application/json";
+            response.ContentLength64 = buffer.Length;
+            response.OutputStream.Write(buffer, 0, buffer.Length);
+            response.Close();
+            HttpServerService.LogRequest(context.Request, 500);
+        }
+    }
+
+    private static async Task HandleGraphPatternsApi(HttpListenerContext context)
+    {
+        var response = context.Response;
+
+        try
+        {
+            var patterns = FalkorDBVectorStore.GetCommonPatterns();
+
+            response.ContentType = "application/json";
+            response.StatusCode = 200;
+            var resultJson = JsonSerializer.Serialize(patterns, JsonOptions);
+            var resultBuffer = Encoding.UTF8.GetBytes(resultJson);
+            response.ContentLength64 = resultBuffer.Length;
+            response.OutputStream.Write(resultBuffer, 0, resultBuffer.Length);
+            response.Close();
+            HttpServerService.LogRequest(context.Request, 200);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"❌ Graph Patterns API Error: {ex.Message}");
+            response.StatusCode = 500;
+            var errorJson = $"{{\"error\":\"{WebUtility.HtmlEncode(ex.Message)}\"}}";
+            var buffer = Encoding.UTF8.GetBytes(errorJson);
+            response.ContentType = "application/json";
+            response.ContentLength64 = buffer.Length;
+            response.OutputStream.Write(buffer, 0, buffer.Length);
+            response.Close();
+            HttpServerService.LogRequest(context.Request, 500);
+        }
+    }
+
+    // ============================================================
+    // MCP Tool Handlers for Graph Queries
+    // ============================================================
+
+    private static async Task<CallToolResult> HandleQueryGraphTool(Dictionary<string, object>? arguments)
+    {
+        if (arguments == null || !arguments.TryGetValue("query", out var queryObj))
+        {
+            return McpProtocolService.CreateToolError("Missing 'query' parameter");
+        }
+
+        var query = queryObj?.ToString();
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return McpProtocolService.CreateToolError("Query cannot be empty");
+        }
+
+        try
+        {
+            var store = VectorStoreFactory.Create(_storeType ?? "json", _connectionString, _indexName) as FalkorDBVectorStore;
+            if (store == null)
+            {
+                return McpProtocolService.CreateToolError("FalkorDB store is required for graph queries");
+            }
+
+            Dictionary<string, object>? parameters = null;
+            if (arguments.TryGetValue("parameters", out var paramsObj) && paramsObj != null)
+            {
+                parameters = JsonSerializer.Deserialize<Dictionary<string, object>>(JsonSerializer.Serialize(paramsObj));
+            }
+
+            var result = await store.ExecuteCypherQuery(query, parameters);
+            
+            if (result.Success)
+            {
+                var resultText = $"Query returned {result.RowCount} rows in {result.ExecutionTimeMs:F2}ms:\n\n";
+                resultText += JsonSerializer.Serialize(result.Results, new JsonSerializerOptions { WriteIndented = true });
+                return McpProtocolService.CreateToolResult(resultText);
+            }
+            else
+            {
+                return McpProtocolService.CreateToolError($"Query failed: {result.Error}");
+            }
+        }
+        catch (Exception ex)
+        {
+            return McpProtocolService.CreateToolError($"Error executing graph query: {ex.Message}");
+        }
+    }
+
+    private static async Task<CallToolResult> HandleGraphStatisticsTool()
+    {
+        try
+        {
+            var store = VectorStoreFactory.Create(_storeType ?? "json", _connectionString, _indexName) as FalkorDBVectorStore;
+            if (store == null)
+            {
+                return McpProtocolService.CreateToolError("FalkorDB store is required");
+            }
+
+            var stats = await store.GetGraphStatistics();
+            var text = $"Graph Statistics:\n\n" +
+                      $"Total Nodes: {stats.NodeCount}\n" +
+                      $"Total Relationships: {stats.RelationshipCount}\n\n" +
+                      $"Nodes by Label:\n" +
+                      string.Join("\n", stats.NodesByLabel.Select(kvp => $"  {kvp.Key}: {kvp.Value}")) +
+                      $"\n\nRelationships by Type:\n" +
+                      string.Join("\n", stats.RelationshipsByType.Select(kvp => $"  {kvp.Key}: {kvp.Value}"));
+
+            return McpProtocolService.CreateToolResult(text);
+        }
+        catch (Exception ex)
+        {
+            return McpProtocolService.CreateToolError($"Error getting graph statistics: {ex.Message}");
+        }
+    }
+
+    private static async Task<CallToolResult> HandleServiceDependenciesTool(Dictionary<string, object>? arguments)
+    {
+        if (arguments == null || !arguments.TryGetValue("serviceId", out var serviceIdObj))
+        {
+            return McpProtocolService.CreateToolError("Missing 'serviceId' parameter");
+        }
+
+        var serviceId = serviceIdObj?.ToString();
+        if (string.IsNullOrWhiteSpace(serviceId))
+        {
+            return McpProtocolService.CreateToolError("Service ID cannot be empty");
+        }
+
+        try
+        {
+            var store = VectorStoreFactory.Create(_storeType ?? "json", _connectionString, _indexName) as FalkorDBVectorStore;
+            if (store == null)
+            {
+                return McpProtocolService.CreateToolError("FalkorDB store is required");
+            }
+
+            var dependencies = await store.GetServiceDependencies(serviceId);
+            var dependents = await store.GetServiceDependents(serviceId);
+            
+            var text = $"Dependency Analysis for '{serviceId}':\n\n";
+            text += $"Dependencies ({dependencies.Count}): What '{serviceId}' depends on\n";
+            foreach (var dep in dependencies)
+            {
+                text += $"  - {dep.Id} ({dep.Label})\n";
+            }
+            
+            text += $"\nDependents ({dependents.Count}): What depends on '{serviceId}'\n";
+            foreach (var dep in dependents)
+            {
+                text += $"  - {dep.Id} ({dep.Label})\n";
+            }
+
+            var includeImpact = arguments.TryGetValue("includeImpact", out var impactObj) && 
+                               impactObj is bool b && b;
+            
+            if (includeImpact)
+            {
+                var impact = await store.GetImpactAnalysis(serviceId);
+                text += $"\n\nImpact Analysis ({impact.Count}): All services affected if '{serviceId}' fails\n";
+                foreach (var dep in impact)
+                {
+                    text += $"  - {dep.Id} ({dep.Label})\n";
+                }
+            }
+
+            return McpProtocolService.CreateToolResult(text);
+        }
+        catch (Exception ex)
+        {
+            return McpProtocolService.CreateToolError($"Error analyzing dependencies: {ex.Message}");
+        }
+    }
+
+    private static async Task<CallToolResult> HandleTeamOwnershipTool(Dictionary<string, object>? arguments)
+    {
+        if (arguments == null || !arguments.TryGetValue("teamId", out var teamIdObj))
+        {
+            return McpProtocolService.CreateToolError("Missing 'teamId' parameter");
+        }
+
+        var teamId = teamIdObj?.ToString();
+        if (string.IsNullOrWhiteSpace(teamId))
+        {
+            return McpProtocolService.CreateToolError("Team ID cannot be empty");
+        }
+
+        try
+        {
+            var store = VectorStoreFactory.Create(_storeType ?? "json", _connectionString, _indexName) as FalkorDBVectorStore;
+            if (store == null)
+            {
+                return McpProtocolService.CreateToolError("FalkorDB store is required");
+            }
+
+            var ownership = await store.GetTeamOwnership(teamId);
+            
+            var text = $"Team Ownership for '{teamId}':\n\n";
+            
+            if (ownership.TryGetValue("services", out var services))
+            {
+                text += $"Services ({services.Count}):\n";
+                text += string.Join("\n", services.Select(s => $"  - {s.Id}"));
+            }
+            
+            if (ownership.TryGetValue("resources", out var resources))
+            {
+                text += $"\n\nResources ({resources.Count}):\n";
+                text += string.Join("\n", resources.Select(r => $"  - {r.Id}"));
+            }
+
+            return McpProtocolService.CreateToolResult(text);
+        }
+        catch (Exception ex)
+        {
+            return McpProtocolService.CreateToolError($"Error getting team ownership: {ex.Message}");
+        }
     }
 
     private class QueryRequest
